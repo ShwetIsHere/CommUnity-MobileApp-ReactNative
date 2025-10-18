@@ -1,25 +1,38 @@
-import { Stack, Link } from 'expo-router';
-
-import { View } from 'react-native';
-
-import { Button } from '@/components/Button';
-import { Container } from '@/components/Container';
-import { ScreenContent } from '@/components/ScreenContent';
+import { Redirect } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { View, ActivityIndicator } from 'react-native';
+import { supabase } from '@/utils/supabase';
 
 export default function Home() {
-  return (
-    <View className={styles.container}>
-      <Stack.Screen options={{ title: 'Home' }} />
-      <Container>
-        <ScreenContent path="app/index.tsx" title="Home"></ScreenContent>
-        <Link href={{ pathname: '/details', params: { name: 'Dan' } }} asChild>
-          <Button title="Show Details" />
-        </Link>
-      </Container>
-    </View>
-  );
-}
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-const styles = {
-  container: 'flex flex-1 bg-white',
-};
+  useEffect(() => {
+    // Check if user is already logged in
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      setIsAuthenticated(!!session);
+    } catch (error) {
+      console.error('Error checking auth:', error);
+      setIsAuthenticated(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Show loading spinner while checking auth
+  if (isLoading) {
+    return (
+      <View className="flex-1 bg-gray-950 items-center justify-center">
+        <ActivityIndicator size="large" color="#06B6D4" />
+      </View>
+    );
+  }
+
+  // Redirect based on auth state
+  return <Redirect href={isAuthenticated ? "/(tabs)/feed" : "/welcome"} />;
+}
