@@ -63,8 +63,6 @@ Reels is a dedicated space for watching short-form vertical videos.
 
 #### **Video Experience:**
 - 📹 **Vertical Scrolling** - Swipe up to see the next video
-- ▶️ **Auto-Play** - Videos play automatically as you scroll
-- 🔇 **Tap to Mute/Unmute** - Control audio with a tap
 - 📐 **Original Aspect Ratio** - Videos display in their original dimensions (no cropping)
 - ⏸️ **Background Stop** - Videos automatically stop when you leave the screen (no background audio)
 
@@ -72,7 +70,6 @@ Reels is a dedicated space for watching short-form vertical videos.
 - Username and profile picture
 - Video caption
 - Like count
-- View count (coming soon)
 
 #### **Interactions:**
 - ❤️ Like videos
@@ -203,15 +200,13 @@ Send private messages to other users (feature in development).
 
 ### **Bottom Navigation Tabs:**
 - 🏠 **Home** - Main feed with all posts
+- 🔍 **Search** - Search friends & Contant Creater
 - 🎬 **Reels** - Video-only vertical feed
-- ➕ **Create** - Upload new photo or video
-- 💬 **Messages** - Direct messaging (coming soon)
+- 💬 **Messages** - Direct messaging
 - 👤 **Profile** - Your profile and settings
 
 ### **Top Navigation:**
 - 📷 **Camera Icon** - Quick access to create post
-- 🔔 **Notifications** - Activity updates (coming soon)
-- ⚙️ **Settings** - App settings and preferences (coming soon)
 
 ---
 
@@ -246,15 +241,9 @@ Send private messages to other users (feature in development).
 ## ⚡ Quick Actions
 
 ### **Common Gestures:**
-- **Double-tap** post → Like
 - **Single-tap** video → Play/Pause
-- **Long-press** your post → Delete options
 - **Swipe up** in reels → Next video
 - **Pull down** in feed → Refresh
-
-### **Keyboard Shortcuts:**
-- Type and press Enter → Send message
-- Esc → Close modal/dialog
 
 ---
 
@@ -263,7 +252,6 @@ Send private messages to other users (feature in development).
 ### **Your Control:**
 - ✅ Only you can edit your profile
 - ✅ Only you can delete your posts
-- ✅ You control who you follow
 - ✅ Your data is securely stored
 
 ### **Content Guidelines:**
@@ -277,7 +265,7 @@ Send private messages to other users (feature in development).
 ## 🐛 Troubleshooting
 
 ### **Can't Upload Image?**
-- Check camera/storage permissions
+- Check camera/storage & formets permissions
 - Ensure image isn't too large
 - Try taking a new photo instead
 
@@ -310,8 +298,6 @@ Upcoming features we're working on:
 - 🔍 **Search** - Find users and posts
 - #️⃣ **Hashtags** - Discover posts by topic
 - 📌 **Save Posts** - Bookmark your favorites
-- 🎨 **Filters** - Photo and video effects
-- 🌙 **Theme Toggle** - Switch between dark/light mode
 
 ---
 
@@ -320,7 +306,6 @@ Upcoming features we're working on:
 If you encounter any issues or have questions:
 - Check the setup guide: `README-SETUP.md`
 - Review technical details: `README-ABOUT.md`
-- Contact support through the app (coming soon)
 
 ---
 

@@ -169,8 +169,6 @@ CommUnity aims to create a community-focused social networking experience where 
 ## 📱 Platform Support
 
 - ✅ **Android** (Fully supported, tested)
-- ✅ **iOS** (Fully supported)
-- ⚠️ **Web** (Limited support, some features unavailable)
 
 ## 🔐 Security & Privacy
 
@@ -192,16 +190,8 @@ CommUnity aims to create a community-focused social networking experience where 
 ## 🚀 Future Enhancements
 
 Potential features for future versions:
-- [ ] Comments on posts
-- [ ] Story feature (24-hour temporary posts)
-- [ ] Video filters and effects
-- [ ] Push notifications
 - [ ] Hashtag system
 - [ ] Search functionality
-- [ ] Share posts to other platforms
-- [ ] Dark/Light theme toggle
-- [ ] Multiple image posts (carousel)
-- [ ] Save/Bookmark posts
 
 ## 👥 Target Audience
 
@@ -223,7 +213,6 @@ For technical documentation:
 - Setup Guide: `README-SETUP.md`
 - Feature Documentation: `README-FEATURES.md`
 - Database Schema: `database-setup.sql`
-- Build Instructions: `BUILD_INSTRUCTIONS.md`
 
 ---
 
