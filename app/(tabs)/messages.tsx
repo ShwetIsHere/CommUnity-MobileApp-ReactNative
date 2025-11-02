@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StatusBar, FlatList, Image, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, StatusBar, FlatList, Image, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
 import { Stack, router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/utils/supabase';
@@ -24,6 +24,7 @@ export default function MessagesScreen() {
 
   useEffect(() => {
     fetchCurrentUser();
+    setLoading(true); // Show initial loading
     fetchConversations();
     
     // Subscribe to real-time updates for new messages
@@ -47,7 +48,7 @@ export default function MessagesScreen() {
   // Refresh conversations when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
-      console.log('📱 Messages screen focused - refreshing conversations');
+      // Fetch conversations in background without blocking navigation
       fetchConversations();
     }, [])
   );
@@ -61,8 +62,11 @@ export default function MessagesScreen() {
 
   const fetchConversations = async () => {
     try {
-      setLoading(true);
-      setRefreshing(true);
+      // Don't block UI on focus refresh
+      if (!loading) {
+        setRefreshing(true);
+      }
+      
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
@@ -71,22 +75,18 @@ export default function MessagesScreen() {
         return;
       }
 
-      console.log('\n🔍 === FETCHING CONVERSATIONS FOR USER:', user.id, '===');
-
-      // Get all conversations for current user
+      // Get all conversation IDs for current user
       const { data: conversationsData, error } = await supabase
         .from('conversation_participants')
         .select('conversation_id')
         .eq('user_id', user.id);
 
       if (error) {
-        console.error('❌ Error fetching conversations:', error);
+        console.error('Error fetching conversations:', error);
         setLoading(false);
         setRefreshing(false);
         return;
       }
-
-      console.log('✅ Found', conversationsData?.length || 0, 'conversations');
 
       if (!conversationsData || conversationsData.length === 0) {
         setConversations([]);
@@ -95,77 +95,74 @@ export default function MessagesScreen() {
         return;
       }
 
-      // Get details for each conversation
-      const conversationsList = await Promise.all(
-        conversationsData.map(async (conv: any) => {
-          const conversationId = conv.conversation_id;
-          
-          console.log('\n=== Processing Conversation:', conversationId, '===');
-          
-          // First, get the OTHER user from conversation_participants
-          const { data: participants } = await supabase
-            .from('conversation_participants')
-            .select('user_id')
-            .eq('conversation_id', conversationId)
-            .neq('user_id', user.id)
-            .maybeSingle();
+      const conversationIds = conversationsData.map(c => c.conversation_id);
 
-          const otherUserId = participants?.user_id;
-          console.log('👤 Other user ID:', otherUserId);
+      // Optimized: Get all data in parallel with fewer queries
+      const [participantsResult, messagesResult, unreadResult, profilesResult] = await Promise.all([
+        // Get all participants for these conversations
+        supabase
+          .from('conversation_participants')
+          .select('conversation_id, user_id')
+          .in('conversation_id', conversationIds),
+        
+        // Get last message for each conversation
+        supabase
+          .from('messages')
+          .select('conversation_id, sender_id, receiver_id, content, created_at')
+          .in('conversation_id', conversationIds)
+          .order('created_at', { ascending: false }),
+        
+        // Get ONLY unread messages where current user is the receiver
+        supabase
+          .from('messages')
+          .select('conversation_id, id')
+          .in('conversation_id', conversationIds)
+          .eq('receiver_id', user.id)
+          .eq('is_read', false),
+        
+        // Get all profiles at once
+        supabase
+          .from('profiles')
+          .select('id, username, full_name, avatar_url')
+      ]);
 
-          // Get last message for this conversation
-          const { data: lastMessage } = await supabase
-            .from('messages')
-            .select('sender_id, receiver_id, content, created_at')
-            .eq('conversation_id', conversationId)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+      const allParticipants = participantsResult.data || [];
+      const allMessages = messagesResult.data || [];
+      const unreadMessages = unreadResult.data || [];
+      const allProfiles = profilesResult.data || [];
 
-          console.log('💬 Last message:', lastMessage?.content);
+      // Build conversations list efficiently
+      const conversationsList = conversationIds.map(conversationId => {
+        // Find other participant
+        const otherParticipant = allParticipants.find(
+          p => p.conversation_id === conversationId && p.user_id !== user.id
+        );
+        
+        // Find last message
+        const lastMessage = allMessages.find(m => m.conversation_id === conversationId);
+        
+        // Find profile
+        const profile = allProfiles.find(p => p.id === otherParticipant?.user_id);
+        
+        // Count ONLY unread messages where I'm the receiver
+        const unreadCount = unreadMessages.filter(
+          m => m.conversation_id === conversationId
+        ).length;
 
-          // Fetch profile from profiles table
-          let profile = null;
-          if (otherUserId) {
-            const { data: profileData } = await supabase
-              .from('profiles')
-              .select('username, full_name, avatar_url')
-              .eq('id', otherUserId)
-              .single();
-
-            console.log('📋 Profile:', profileData?.username);
-            profile = profileData;
-          }
-
-          // Get unread count
-          const { count: unreadCount } = await supabase
-            .from('messages')
-            .select('*', { count: 'exact', head: true })
-            .eq('conversation_id', conversationId)
-            .eq('is_read', false)
-            .eq('receiver_id', user.id);
-          
-          console.log('🔴 Unread:', unreadCount);
-          
-          // Priority: full_name > username > "User"
-          const displayName = profile?.full_name || profile?.username || 'User';
-          
-          console.log('✅ Display name:', displayName);
-          console.log('===================================');
-          
-          return {
-            conversation_id: conversationId,
-            participant_id: otherUserId || '',
-            participant_username: profile?.username || 'Unknown',
-            participant_name: displayName,
-            participant_avatar: profile?.avatar_url || 'https://via.placeholder.com/150',
-            last_message: lastMessage?.content || 'Start a conversation',
-            last_message_time: lastMessage?.created_at || new Date().toISOString(),
-            last_message_sender_id: lastMessage?.sender_id || '',
-            unread_count: unreadCount || 0,
-          };
-        })
-      );
+        const displayName = profile?.full_name || profile?.username || 'User';
+        
+        return {
+          conversation_id: conversationId,
+          participant_id: otherParticipant?.user_id || '',
+          participant_username: profile?.username || 'Unknown',
+          participant_name: displayName,
+          participant_avatar: profile?.avatar_url || 'https://via.placeholder.com/150',
+          last_message: lastMessage?.content || 'Start a conversation',
+          last_message_time: lastMessage?.created_at || new Date().toISOString(),
+          last_message_sender_id: lastMessage?.sender_id || '',
+          unread_count: unreadCount || 0,
+        };
+      });
 
       // Sort by most recent
       conversationsList.sort((a, b) => 
@@ -173,9 +170,8 @@ export default function MessagesScreen() {
       );
 
       setConversations(conversationsList);
-      console.log('✅ Successfully fetched', conversationsList.length, 'conversations');
     } catch (error) {
-      console.error('❌ Error fetching conversations:', error);
+      console.error('Error fetching conversations:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -272,16 +268,17 @@ export default function MessagesScreen() {
       <View className="pt-12 pb-4 px-4 border-b border-gray-900">
         <View className="flex-row items-center justify-between">
           <Text className="text-white text-2xl font-bold">Messages</Text>
-          <TouchableOpacity>
-            <Ionicons name="create-outline" size={28} color="#fff" />
-          </TouchableOpacity>
+          {refreshing && !loading && (
+            <ActivityIndicator size="small" color="#06b6d4" />
+          )}
         </View>
       </View>
 
       {/* Conversations List */}
       {loading ? (
         <View className="flex-1 items-center justify-center">
-          <Text className="text-gray-400">Loading messages...</Text>
+          <ActivityIndicator size="large" color="#06b6d4" />
+          <Text className="text-gray-400 mt-4">Loading conversations...</Text>
         </View>
       ) : conversations.length === 0 ? (
         <View className="flex-1 items-center justify-center px-8">

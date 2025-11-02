@@ -19,6 +19,7 @@ type Message = {
   sender_id: string;
   content: string;
   created_at: string;
+  is_read?: boolean;
 };
 
 export default function ChatScreen() {
@@ -92,10 +93,10 @@ export default function ChatScreen() {
 
       setMessages(data || []);
       
-      // Mark unread messages as read
-      if (data && data.length > 0) {
+      // Mark unread messages as read (only messages where I'm the receiver)
+      if (data && data.length > 0 && currentUserId) {
         const unreadMessages = data.filter(
-          (msg: Message) => msg.sender_id !== currentUserId
+          (msg: Message) => msg.sender_id !== currentUserId && msg.is_read === false
         );
         unreadMessages.forEach((msg: Message) => markMessageAsRead(msg.id));
       }
@@ -147,6 +148,7 @@ export default function ChatScreen() {
           sender_id: currentUserId,
           receiver_id: userId, // Add receiver_id (the other person)
           content: messageText,
+          is_read: false, // New messages start as unread
         })
         .select()
         .single();
