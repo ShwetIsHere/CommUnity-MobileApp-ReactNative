@@ -43,7 +43,15 @@ export default function ChatScreen() {
         filter: `conversation_id=eq.${conversationId}`
       }, (payload) => {
         const newMsg = payload.new as Message;
-        setMessages((prev) => [...prev, newMsg]);
+        
+        // Only add if message doesn't already exist (prevent duplicates)
+        setMessages((prev) => {
+          const exists = prev.some(msg => msg.id === newMsg.id);
+          if (exists) {
+            return prev; // Message already exists, don't add
+          }
+          return [...prev, newMsg]; // Add new message
+        });
         
         // Mark message as read if it's not from current user
         if (newMsg.sender_id !== currentUserId) {
@@ -219,15 +227,6 @@ export default function ChatScreen() {
               {username}
             </Text>
           </View>
-
-          <View className="flex-row gap-4">
-            <TouchableOpacity>
-              <Ionicons name="call-outline" size={24} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity>
-              <Ionicons name="videocam-outline" size={24} color="#fff" />
-            </TouchableOpacity>
-          </View>
         </View>
       </View>
 
@@ -255,10 +254,6 @@ export default function ChatScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}>
         <View className="flex-row items-center px-4 py-3 border-t border-gray-900 bg-black">
-          <TouchableOpacity className="mr-3">
-            <Ionicons name="camera-outline" size={24} color="#06B6D4" />
-          </TouchableOpacity>
-
           <View className="flex-1 bg-gray-900 rounded-full px-4 py-2 flex-row items-center">
             <TextInput
               className="flex-1 text-white text-base"

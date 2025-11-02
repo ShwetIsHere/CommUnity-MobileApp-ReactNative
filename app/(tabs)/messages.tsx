@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StatusBar, FlatList, Image, TouchableOpacity, RefreshControl } from 'react-native';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/utils/supabase';
 
@@ -26,11 +26,11 @@ export default function MessagesScreen() {
     fetchCurrentUser();
     fetchConversations();
     
-    // Subscribe to real-time updates
+    // Subscribe to real-time updates for new messages
     const channel = supabase
       .channel('conversations_changes')
       .on('postgres_changes', {
-        event: '*',
+        event: 'INSERT',
         schema: 'public',
         table: 'messages'
       }, () => {
@@ -43,6 +43,14 @@ export default function MessagesScreen() {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  // Refresh conversations when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('📱 Messages screen focused - refreshing conversations');
+      fetchConversations();
+    }, [])
+  );
 
   const fetchCurrentUser = async () => {
     const { data: { user } } = await supabase.auth.getUser();
