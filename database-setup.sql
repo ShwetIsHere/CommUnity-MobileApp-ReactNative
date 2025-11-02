@@ -186,9 +186,9 @@ CREATE POLICY "Users can view conversations they're part of"
     )
   );
 
-CREATE POLICY "Users can create conversations"
+CREATE POLICY "Authenticated users can create conversations"
   ON conversations FOR INSERT
-  WITH CHECK (true);
+  WITH CHECK (auth.uid() IS NOT NULL);
 
 -- ============================================
 -- TABLE: conversation_participants
@@ -219,14 +219,9 @@ CREATE POLICY "Users can view participants in their conversations"
     )
   );
 
-CREATE POLICY "Users can add participants to conversations they're in"
+CREATE POLICY "Authenticated users can add participants"
   ON conversation_participants FOR INSERT
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM conversation_participants
-      WHERE conversation_id = conversation_id AND user_id = auth.uid()
-    )
-  );
+  WITH CHECK (auth.uid() IS NOT NULL);
 
 -- ============================================
 -- TABLE: messages

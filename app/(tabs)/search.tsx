@@ -110,8 +110,11 @@ export default function SearchScreen() {
   const handleUserPress = (user: UserResult) => {
     // Navigate to user profile
     router.push({
-      pathname: '/user/[id]',
-      params: { id: user.id }
+      pathname: '/user-profile',
+      params: { 
+        userId: user.id,
+        username: user.username || user.full_name || 'User'
+      }
     });
   };
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, Image, TouchableOpacity, Dimensions, StatusBar, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, Image, TouchableOpacity, Dimensions, StatusBar, ActivityIndicator, Alert } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/utils/supabase';
@@ -17,17 +17,202 @@ export default function UserProfileScreen() {
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isOwnProfile, setIsOwnProfile] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
 
   useEffect(() => {
     checkIfOwnProfile();
     fetchUserData();
     fetchUserPosts();
+    checkFollowStatus();
   }, [userId]);
 
   const checkIfOwnProfile = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user && user.id === userId) {
       setIsOwnProfile(true);
+    }
+  };
+
+  const checkFollowStatus = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('followers')
+        .select('*')
+        .eq('follower_id', user.id)
+        .eq('following_id', userId)
+        .single();
+
+      if (data) {
+        setIsFollowing(true);
+      }
+    } catch (error) {
+      console.log('Not following or error checking:', error);
+    }
+  };
+
+  const handleFollowToggle = async () => {
+    try {
+      setFollowLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        Alert.alert('Error', 'You must be logged in to follow users');
+        return;
+      }
+
+      if (isFollowing) {
+        // Unfollow
+        const { error } = await supabase
+          .from('followers')
+          .delete()
+          .eq('follower_id', user.id)
+          .eq('following_id', userId);
+
+        if (error) {
+          console.error('Error unfollowing:', error);
+          Alert.alert('Error', 'Failed to unfollow user');
+        } else {
+          setIsFollowing(false);
+          setUserData((prev: any) => ({
+            ...prev,
+            followersCount: Math.max(0, (prev.followersCount || 0) - 1),
+          }));
+        }
+      } else {
+        // Follow
+        const { error } = await supabase
+          .from('followers')
+          .insert({
+            follower_id: user.id,
+            following_id: userId,
+          });
+
+        if (error) {
+          console.error('Error following:', error);
+          Alert.alert('Error', 'Failed to follow user');
+        } else {
+          setIsFollowing(true);
+          setUserData((prev: any) => ({
+            ...prev,
+            followersCount: (prev.followersCount || 0) + 1,
+          }));
+        }
+      }
+    } catch (error) {
+      console.error('Error in handleFollowToggle:', error);
+      Alert.alert('Error', 'Something went wrong');
+    } finally {
+      setFollowLoading(false);
+    }
+  };
+
+  const handleMessage = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        Alert.alert('Error', 'You must be logged in to send messages');
+        return;
+      }
+
+      if (!userId) {
+        Alert.alert('Error', 'User information is missing');
+        return;
+      }
+
+      // Check if conversation already exists between these two users
+      const { data: myConversations } = await supabase
+        .from('conversation_participants')
+        .select('conversation_id')
+        .eq('user_id', user.id);
+
+      let conversationId = null;
+
+      if (myConversations && myConversations.length > 0) {
+        // Check if any of these conversations include the target user
+        for (const conv of myConversations) {
+          const { data: participants } = await supabase
+            .from('conversation_participants')
+            .select('user_id')
+            .eq('conversation_id', conv.conversation_id);
+
+          const userIds = participants?.map(p => p.user_id) || [];
+          
+          if (userIds.includes(userId) && userIds.length === 2) {
+            conversationId = conv.conversation_id;
+            break;
+          }
+        }
+      }
+
+      if (conversationId) {
+        // Navigate to existing conversation
+        router.push({
+          pathname: '/chat/[id]',
+          params: {
+            id: conversationId,
+            userId: userId,
+            username: userData?.username || username || 'User',
+            avatar: userData?.avatar || 'https://via.placeholder.com/150',
+          },
+        });
+      } else {
+        // Create new conversation
+        const { data: newConv, error: convError } = await supabase
+          .from('conversations')
+          .insert({
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+
+        if (convError) {
+          console.error('Error creating conversation:', convError);
+          Alert.alert('Error', 'Failed to create conversation. Please try again.');
+          return;
+        }
+
+        // Add both users as participants
+        const { error: participantsError } = await supabase
+          .from('conversation_participants')
+          .insert([
+            { 
+              conversation_id: newConv.id, 
+              user_id: user.id,
+              joined_at: new Date().toISOString(),
+            },
+            { 
+              conversation_id: newConv.id, 
+              user_id: userId,
+              joined_at: new Date().toISOString(),
+            },
+          ]);
+
+        if (participantsError) {
+          console.error('Error adding participants:', participantsError);
+          Alert.alert('Error', 'Failed to add participants');
+          return;
+        }
+
+        // Navigate to the new conversation
+        router.push({
+          pathname: '/chat/[id]',
+          params: {
+            id: newConv.id,
+            userId: userId,
+            username: userData?.username || username || 'User',
+            avatar: userData?.avatar || 'https://via.placeholder.com/150',
+          },
+        });
+      }
+    } catch (error) {
+      console.error('Error in handleMessage:', error);
+      Alert.alert('Error', 'Something went wrong. Please try again.');
     }
   };
 
@@ -184,14 +369,35 @@ export default function UserProfileScreen() {
           </View>
         ) : (
           <View className="flex-row gap-2">
-            <TouchableOpacity className="flex-1 bg-cyan-600 py-2 rounded-lg items-center">
-              <Text className="text-white font-semibold">Follow</Text>
+            <TouchableOpacity 
+              onPress={handleFollowToggle}
+              disabled={followLoading}
+              className={`flex-1 ${isFollowing ? 'bg-gray-800' : 'bg-cyan-600'} py-2 rounded-lg items-center`}
+            >
+              {followLoading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text className="text-white font-semibold">
+                  {isFollowing ? 'Following' : 'Follow'}
+                </Text>
+              )}
             </TouchableOpacity>
-            <TouchableOpacity className="flex-1 bg-gray-800 py-2 rounded-lg items-center">
+            <TouchableOpacity 
+              onPress={handleMessage}
+              className="flex-1 bg-gray-800 py-2 rounded-lg items-center"
+            >
               <Text className="text-white font-semibold">Message</Text>
             </TouchableOpacity>
-            <TouchableOpacity className="bg-gray-800 py-2 px-3 rounded-lg items-center">
-              <Ionicons name="person-add-outline" size={20} color="#FFFFFF" />
+            <TouchableOpacity 
+              onPress={handleFollowToggle}
+              disabled={followLoading}
+              className="bg-gray-800 py-2 px-3 rounded-lg items-center"
+            >
+              <Ionicons 
+                name={isFollowing ? "person-remove-outline" : "person-add-outline"} 
+                size={20} 
+                color="#FFFFFF" 
+              />
             </TouchableOpacity>
           </View>
         )}

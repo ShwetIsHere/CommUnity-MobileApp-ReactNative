@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -115,29 +115,56 @@ export default function ChatScreen() {
     setNewMessage('');
     setLoading(true);
 
+    // Create temporary message object for instant UI update
+    const tempMessage: Message = {
+      id: `temp-${Date.now()}`, // Temporary ID
+      sender_id: currentUserId,
+      content: messageText,
+      created_at: new Date().toISOString(),
+    };
+
+    // Add message to UI immediately
+    setMessages((prev) => [...prev, tempMessage]);
+
+    // Scroll to bottom
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('messages')
         .insert({
           conversation_id: conversationId,
           sender_id: currentUserId,
           receiver_id: userId, // Add receiver_id (the other person)
           content: messageText,
-        });
+        })
+        .select()
+        .single();
 
       if (error) {
         console.error('Error sending message:', error);
-        setNewMessage(messageText); // Restore message on error
+        // Remove temp message and restore input on error
+        setMessages((prev) => prev.filter((msg) => msg.id !== tempMessage.id));
+        setNewMessage(messageText);
+      } else if (data) {
+        // Replace temp message with real message from database
+        setMessages((prev) =>
+          prev.map((msg) => (msg.id === tempMessage.id ? data : msg))
+        );
       }
     } catch (error) {
       console.error('Error:', error);
+      // Remove temp message and restore input on error
+      setMessages((prev) => prev.filter((msg) => msg.id !== tempMessage.id));
       setNewMessage(messageText);
     } finally {
       setLoading(false);
     }
   };
 
-  const renderMessage = ({ item }: { item: Message }) => {
+  const renderMessage = useCallback(({ item }: { item: Message }) => {
     const isOwnMessage = item.sender_id === currentUserId;
 
     return (
@@ -168,7 +195,7 @@ export default function ChatScreen() {
         </View>
       </View>
     );
-  };
+  }, [currentUserId]);
 
   return (
     <View className="flex-1 bg-black">

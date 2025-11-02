@@ -41,6 +41,10 @@
       },
       "package": "com.shwetishere.CommUnity"
     },
+    "updates": {
+      "enabled": false,
+      "fallbackToCacheTimeout": 0
+    },
     "extra": {
       "router": {},
       "eas": {

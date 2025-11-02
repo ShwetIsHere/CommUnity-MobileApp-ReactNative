@@ -65,19 +65,25 @@ export default function MessagesScreen() {
 
       console.log('\n🔍 === FETCHING CONVERSATIONS FOR USER:', user.id, '===');
 
-      // Get all conversations for current user (simple query, no embedding)
+      // Get all conversations for current user
       const { data: conversationsData, error } = await supabase
         .from('conversation_participants')
         .select('conversation_id')
         .eq('user_id', user.id);
 
       if (error) {
-        console.error('Error fetching conversations:', error);
+        console.error('❌ Error fetching conversations:', error);
+        setLoading(false);
+        setRefreshing(false);
         return;
       }
 
+      console.log('✅ Found', conversationsData?.length || 0, 'conversations');
+
       if (!conversationsData || conversationsData.length === 0) {
         setConversations([]);
+        setLoading(false);
+        setRefreshing(false);
         return;
       }
 
@@ -86,9 +92,20 @@ export default function MessagesScreen() {
         conversationsData.map(async (conv: any) => {
           const conversationId = conv.conversation_id;
           
-          console.log('=== Processing Conversation:', conversationId, '===');
+          console.log('\n=== Processing Conversation:', conversationId, '===');
           
-          // Get the OTHER user ID from messages using sender_id or receiver_id
+          // First, get the OTHER user from conversation_participants
+          const { data: participants } = await supabase
+            .from('conversation_participants')
+            .select('user_id')
+            .eq('conversation_id', conversationId)
+            .neq('user_id', user.id)
+            .maybeSingle();
+
+          const otherUserId = participants?.user_id;
+          console.log('👤 Other user ID:', otherUserId);
+
+          // Get last message for this conversation
           const { data: lastMessage } = await supabase
             .from('messages')
             .select('sender_id, receiver_id, content, created_at')
@@ -97,26 +114,18 @@ export default function MessagesScreen() {
             .limit(1)
             .maybeSingle();
 
-          console.log('Last message:', lastMessage);
-
-          // The other user is either the sender (if I'm receiver) or receiver (if I'm sender)
-          const otherUserId = lastMessage?.sender_id === user.id 
-            ? lastMessage?.receiver_id 
-            : lastMessage?.sender_id;
-
-          console.log('Other user ID:', otherUserId);
+          console.log('💬 Last message:', lastMessage?.content);
 
           // Fetch profile from profiles table
           let profile = null;
           if (otherUserId) {
-            const { data: profileData, error: profileError } = await supabase
+            const { data: profileData } = await supabase
               .from('profiles')
               .select('username, full_name, avatar_url')
               .eq('id', otherUserId)
               .single();
 
-            console.log('Profile data:', profileData);
-            console.log('Profile error:', profileError);
+            console.log('📋 Profile:', profileData?.username);
             profile = profileData;
           }
 
@@ -126,13 +135,15 @@ export default function MessagesScreen() {
             .select('*', { count: 'exact', head: true })
             .eq('conversation_id', conversationId)
             .eq('is_read', false)
-            .eq('receiver_id', user.id); // Count messages WHERE I am the receiver and haven't read
+            .eq('receiver_id', user.id);
+          
+          console.log('🔴 Unread:', unreadCount);
           
           // Priority: full_name > username > "User"
           const displayName = profile?.full_name || profile?.username || 'User';
           
-          console.log('Final display name:', displayName);
-          console.log('===================================\n');
+          console.log('✅ Display name:', displayName);
+          console.log('===================================');
           
           return {
             conversation_id: conversationId,
@@ -140,8 +151,8 @@ export default function MessagesScreen() {
             participant_username: profile?.username || 'Unknown',
             participant_name: displayName,
             participant_avatar: profile?.avatar_url || 'https://via.placeholder.com/150',
-            last_message: lastMessage?.content || 'No messages yet',
-            last_message_time: lastMessage?.created_at || '',
+            last_message: lastMessage?.content || 'Start a conversation',
+            last_message_time: lastMessage?.created_at || new Date().toISOString(),
             last_message_sender_id: lastMessage?.sender_id || '',
             unread_count: unreadCount || 0,
           };
